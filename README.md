@@ -1,4 +1,6 @@
 # uncertaintyIndicators
+[![GitHub license](https://img.shields.io/github/license/Naereen/StrapDown.js.svg)](https://github.com/Loop3D/uncertaintyIndicators/blob/master/LICENSE)
+[![DOI](https://zenodo.org/badge/377036385.svg)](https://zenodo.org/badge/latestdoi/377036385)
 
 uncertaintyIndicators.py provides several functions to analyse the variability among an ensemble of voxets. It allows the computation of local measures of uncertainty (cardinality and entropy) and of global dissimilarity measures (e.g. based on multiple-point statistical analysis or wavelet decomposition among other possibilities).
 
