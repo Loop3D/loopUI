@@ -1174,19 +1174,6 @@ def dist_experimental_variogram(img1,img2,xxx,yyy,zzz,nblags,maxh,maxnbsamples,p
         d = dist_experimental_variogram_categorical(img1,img2,xxx,yyy,zzz,nblags,maxh,maxnbsamples,pnorm,seed,label=label,verb=verb,plot=plot)
     return d
 
-def kldiv(pVec1,pVec2,base,divtype):
-    eps2 = np.finfo('float').eps**2
-    pVec1 = pVec1 + eps2 
-    pVec2 = pVec2 + eps2
-    if divtype=='kl':
-        KL = np.sum(pVec1 * np.log(pVec1 / pVec2) / np.log(base))
-    elif divtype=='js':
-        pM = (pVec1 + pVec2)/2
-        KL = 0.5 * np.sum(pVec1 * np.log(pVec1 / pM) / np.log(base)) + 0.5 * np.sum(pVec2 * np.log(pVec2 / pM) / np.log(base))
-    elif divtype=='sym':
-        KL = ( np.sum(pVec1 * np.log(pVec1 / pVec2) / np.log(base)) + np.sum(pVec2 * np.log(pVec2 / pVec1) / np.log(base)) ) /2
-    return KL
-
 def dist_wavelet2D(img1,img2,n_levels,n_bins,plot=False,verb=False):
     w = 1/(0+n_levels*4) # uniform weight per histogram  in the JS divergence
     DIV = 0
@@ -1429,3 +1416,195 @@ def plot_wvt3Ddec(coeffs1,coeffs2,l):
     del array1,array2
     return
 
+#%% TOPOLOGY FUNCTIONS
+def topological_adjacency2D(img2D,categval,verb):
+    [ny,nx] = img2D.shape
+    topo_adjacency = np.zeros((len(categval),len(categval)))
+    # find boundaries of categorical geobodies in img2D
+    img2DdxP = np.append(np.reshape(img2D[:,0],[ny,1]),img2D[:,:-1],axis=1) - img2D 
+    img2DdxN = img2D - np.append(img2D[:,1:],np.reshape(img2D[:,-1],[ny,1]),axis=1)
+    img2DdyP = np.append(np.reshape(img2D[0,:],[1,nx]),img2D[:-1,:],axis=0) - img2D
+    img2DdyN = img2D - np.append(img2D[1:,:],np.reshape(img2D[-1,:],[1,nx]),axis=0)
+    img2Dbdy = ( (img2DdxN != 0) | (img2DdxP != 0) | (img2DdyN != 0) | (img2DdyP != 0) ) 
+    for v in range(len(categval)):
+        tmpiy,tmpix = np.where((1*img2Dbdy)*(img2D==categval[v]))
+        tmpiyNeighbors = np.concatenate( (tmpiy,    tmpiy,    np.maximum(0,tmpiy-1),    np.minimum(tmpiy+1,ny-1)    )) # xprev, xnext, yprev, ynext
+        tmpixNeighbors = np.concatenate( (np.maximum(0,tmpix-1),    np.minimum(tmpix+1,nx-1),    tmpix,    tmpix    )) # xprev, xnext, yprev, ynext
+        tmpNgbVal = np.unique(img2D[tmpiyNeighbors,tmpixNeighbors])
+        tmpidNgbVal = np.ones(len(tmpNgbVal)) * np.nan
+        for n in range(len(tmpNgbVal)):
+            tmpidNgbVal[n] = (np.asarray(np.where(categval==tmpNgbVal[n])).flatten())
+        tmpidNgbVal = tmpidNgbVal.astype(int)
+        topo_adjacency[v,tmpidNgbVal] = 1
+        topo_adjacency[tmpidNgbVal,v] = 1
+        topo_adjacency[v,v] = 0
+    if verb:
+        print('unique values in boundaries: '+str(np.unique(img2D[img2Dbdy])))
+        print('adjacency matrix: \n'+str(topo_adjacency))
+    return topo_adjacency
+
+def topological_adjacency3D(img3D,categval,verb):
+    [nz,ny,nx] = img3D.shape
+    topo_adjacency = np.zeros((len(categval),len(categval)))
+    # find boundaries of categorical geobodies in img3D
+    img3DdxP = np.append(np.reshape(img3D[:,:,0],[nz,ny,1]),img3D[:,:,:-1],axis=2) - img3D 
+    img3DdxN = img3D - np.append(img3D[:,:,1:],np.reshape(img3D[:,:,-1],[nz,ny,1]),axis=2)
+    img3DdyP = np.append(np.reshape(img3D[:,0,:],[nz,1,nx]),img3D[:,:-1,:],axis=1) - img3D
+    img3DdyN = img3D - np.append(img3D[:,1:,:],np.reshape(img3D[:,-1,:],[nz,1,nx]),axis=1)
+    img3DdzP = np.append(np.reshape(img3D[0,:,:],[1,ny,nx]),img3D[:-1,:,:],axis=0) - img3D
+    img3DdzN = img3D - np.append(img3D[1:,:,:],np.reshape(img3D[-1,:,:],[1,ny,nx]),axis=0)
+    img3Dbdy = ( (img3DdxN != 0) | (img3DdxP != 0) | (img3DdyN != 0) | (img3DdyP != 0) | (img3DdzN != 0) | (img3DdzP != 0) ) 
+    # for each graph node (or geobody)
+    for v in range(len(categval)):
+        # get boundary coordinates
+        tmpiz,tmpiy,tmpix = np.where((1*img3Dbdy)*(img3D==categval[v]))
+        # find neighbours
+        tmpizNeighbors = np.concatenate( (tmpiz,    tmpiz,    tmpiz,    tmpiz,  np.maximum(0,tmpiz-1),    np.minimum(tmpiz+1,nz-1)    )) # xprev, xnext, yprev, ynext, zprev, znext
+        tmpiyNeighbors = np.concatenate( (tmpiy,    tmpiy,    np.maximum(0,tmpiy-1),    np.minimum(tmpiy+1,ny-1),   tmpiy,    tmpiy   )) # xprev, xnext, yprev, ynext, zprev, znext
+        tmpixNeighbors = np.concatenate( (np.maximum(0,tmpix-1),    np.minimum(tmpix+1,nx-1),    tmpix,    tmpix,   tmpix,    tmpix   )) # xprev, xnext, yprev, ynext, zprev, znext
+        # find unique list of geobodies neighbours of currend graph node or geobody
+        tmpNgbVal = np.unique(img3D[tmpizNeighbors,tmpiyNeighbors,tmpixNeighbors])
+        tmpidNgbVal = np.ones(len(tmpNgbVal)) * np.nan
+        # find corresponding position (line id in adjacency matrix)
+        for n in range(len(tmpNgbVal)):
+            tmpidNgbVal[n] = (np.asarray(np.where(categval==tmpNgbVal[n])).flatten())
+        tmpidNgbVal = tmpidNgbVal.astype(int)
+        topo_adjacency[v,tmpidNgbVal] = 1
+        topo_adjacency[tmpidNgbVal,v] = 1
+        topo_adjacency[v,v] = 0
+    if verb:
+        print('unique values in boundaries: '+str(np.unique(img3D[img3Dbdy])))
+        print('adjacency matrix: \n'+str(topo_adjacency))
+    return topo_adjacency
+
+def topological_adjacency(img,categval,verb=0):
+    if len(img.shape)==2:
+        topo_adjacency = topological_adjacency2D(img,categval,verb)
+    elif len(img.shape)==3:
+        topo_adjacency = topological_adjacency3D(img,categval,verb)
+    return topo_adjacency
+
+def structural_hamming_distance(topo1adjacency,topo2adjacency):
+    # normalized structural hamming distance
+    n = topo1adjacency.shape[0]
+    shd = np.sum(np.abs(topo1adjacency-topo2adjacency))/(n*(n-1))
+    return shd
+
+def laplacian_spectral_graph_distance(topo1adjacency,topo2adjacency):
+    Mij=topo1adjacency.shape[0]
+    lpl1 = topo1adjacency + -np.diag(np.sum(topo1adjacency,axis=0))
+    eig1,vec1 = np.linalg.eig(lpl1)
+    vec1srt = vec1+0
+    vec1srt.sort(axis=0)
+    # vec1 @ ( np.diag(eig1) @ np.transpose(vec1) ) # should equal lpl1 +- numerical errors
+    lpl2 = topo2adjacency + -np.diag(np.sum(topo2adjacency,axis=0))
+    eig2,vec2 = np.linalg.eig(lpl2)
+    vec2srt = vec2+0
+    vec2srt.sort(axis=0)    
+    rhodist = np.sum(np.abs(vec1srt-vec2srt)/Mij,axis=0)
+    lsgd = 1/Mij * np.sum(rhodist)
+    return lsgd
+
+def discretize_img_pair(tmp1,tmp2,npctiles):
+    pctiles = np.arange(npctiles+1)*100/npctiles
+    tmp = np.concatenate((tmp1.flatten(), tmp2.flatten()))
+    pct_th = np.percentile(tmp,pctiles)
+    pct_th[0] -= 1
+    img1 = np.ones(tmp1.shape)*np.nan
+    img2 = np.ones(tmp2.shape)*np.nan
+    for i in range(npctiles):
+        ix1 = np.where((tmp1>pct_th[i]) * (tmp1<=pct_th[i+1]))
+        img1[ix1] = i
+        ix2 = np.where((tmp2>pct_th[i]) * (tmp2<=pct_th[i+1]))
+        img2[ix2] = i
+    return img1,img2
+
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
+def plot_topology_adjacency(categ1,categ2,adjac1,adjac2,leg,shd,lsgd,conti1=np.asarray(0),conti2=np.asarray(0)):
+    ndim = len(categ1.shape)
+    if ndim==3:
+        [nz,ny,nx]=categ1.shape
+        sliceid = int((nz-1)/2)
+    elif ndim==2:
+        [ny,nx]=categ1.shape
+    if len(conti1.shape)>1:
+        vmin = np.min([conti1.min(),conti2.min()])
+        vmax = np.max([conti1.max(),conti2.max()])
+    wmin = np.min([categ1.min(),categ2.min()])
+    wmax = np.max([categ1.max(),categ2.max()])
+    fig = plt.figure()
+    gs = fig.add_gridspec(5,3)
+    ax00 = fig.add_subplot(gs[:2, 0])
+    ax01 = fig.add_subplot(gs[:2, 1])
+    ax02 = fig.add_subplot(gs[:2, 2])
+    ax10 = fig.add_subplot(gs[2:4, 0])
+    ax11 = fig.add_subplot(gs[2:4, 1])
+    ax12 = fig.add_subplot(gs[2:4, 2])
+    ax20 = fig.add_subplot(gs[4, 0])
+    ax21 = fig.add_subplot(gs[4, 1:])
+    if len(conti1.shape)>1:
+        axins = inset_axes(ax20,
+                           width="90%",  # width = 5% of parent_bbox width
+                           height="20%",  # height : 50%
+                           loc='center left'
+                           )
+    ax00.axis('off')
+    ax01.axis('off')
+    ax02.axis('off')
+    ax01.set_title('categ 1')
+    ax02.set_title('adjacency 1')
+    ax10.axis('off')
+    ax11.axis('off')
+    ax12.axis('off')
+    ax11.set_title('categ 2')
+    ax12.set_title('adjacency 2')
+    ax20.axis('off')
+    ax21.axis('off')  
+    if ndim==3:
+        if len(conti1.shape)>1:
+            pos00=ax00.imshow(conti1[sliceid,:,:],cmap='rainbow',vmin=vmin,vmax=vmax)
+            ax10.imshow(conti2[sliceid,:,:],cmap='rainbow',vmin=vmin,vmax=vmax)
+        ax01.imshow(categ1[sliceid,:,:],cmap='rainbow',vmin=wmin,vmax=wmax)
+        ax11.imshow(categ2[sliceid,:,:],cmap='rainbow',vmin=wmin,vmax=wmax)
+    elif ndim==2:
+        if len(conti1.shape)>1:
+            pos00=ax00.imshow(conti1[:,:],cmap='rainbow',vmin=vmin,vmax=vmax)
+            ax10.imshow(conti2[:,:],cmap='rainbow',vmin=vmin,vmax=vmax)
+        ax01.imshow(categ1[:,:],cmap='rainbow',vmin=wmin,vmax=wmax)
+        ax11.imshow(categ2[:,:],cmap='rainbow',vmin=wmin,vmax=wmax)        
+    if len(conti1.shape)>1:
+        ax00.set_title('img1')
+        ax10.set_title('img2')
+        fig.colorbar(pos00,cax=axins,label=leg, orientation="horizontal") 
+        axins.xaxis.set_ticks_position("bottom")
+    ax02.imshow(adjac1[:,:])
+    ax12.imshow(adjac2[:,:])
+    ax21.text(0.15,0.5,"Structural Hamming Distance: %.3f" % shd)
+    ax21.text(0.15,0.1,"Spectral Laplacian Distance: %.3f" % lsgd)
+    fig.subplots_adjust(left=0.0, bottom=0.0, right=1.0, top=0.95, wspace=0.02, hspace=0.6)
+    plt.show()
+    return
+
+def topo_dist(img1, img2, npctiles=0, verb=0, plot=0, leg=" "):
+    if npctiles>0:
+        if verb:
+            print('discretize')
+        categ1,categ2 = discretize_img_pair(img1,img2,npctiles)
+    else:
+        categ1 = img1
+        categ2 = img2
+    categval = np.unique(np.append(categ1,categ2))
+    topo1adjacency = topological_adjacency(categ1,categval,verb)
+    topo2adjacency = topological_adjacency(categ2,categval,verb)
+    shd = structural_hamming_distance(topo1adjacency,topo2adjacency)
+    lsgd = laplacian_spectral_graph_distance(topo1adjacency,topo2adjacency)
+    if verb:
+        print(leg+' structural Hamming distance: '+str(shd))
+        print(leg+' Laplacian spectral graph distance: '+str(lsgd))  
+    if plot:
+        if npctiles>0:
+            plot_topology_adjacency(categ1,categ2,topo1adjacency,topo2adjacency,leg,shd,lsgd,img1,img2)
+        else:
+            plot_topology_adjacency(categ1,categ2,topo1adjacency,topo2adjacency,leg,shd,lsgd)
+    return shd,lsgd
