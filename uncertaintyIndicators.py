@@ -111,6 +111,47 @@ def cardinality(array):
     crd=crd.reshape(voxetdim)    
     return crd
 
+def plot_cardinality(mag_crd,grv_crd,lit_crd,rho_crd,sus_crd,lgdlong,lgdsmall,litholgd):
+    fig, ax = plt.subplots(2,6) #,figsize=(13,13)
+    ax[0,0].axis('off')
+    ax[0,1].axis('off')
+    ax[0,2].axis('off')
+    ax[0,3].axis('off')
+    ax[0,4].axis('off')
+    ax[0,5].axis('off')
+    ax[1,0].axis('off')
+    ax[1,1].axis('off')
+    ax[1,2].axis('off')
+    ax[1,3].axis('off')
+    ax[1,4].axis('off')
+    ax[1,5].axis('off')
+    ax[0,0].set_title(lgdlong+' & '+litholgd )
+    ax[0,1].set_title(lgdsmall+' mag') #title.set_text
+    ax[0,2].set_title(lgdsmall+' grav')
+    ax[0,3].set_title(litholgd+' Map')
+    ax[0,4].set_title(litholgd+' W (N) E')
+    ax[0,5].set_title(litholgd+' N (W) S')
+    ax[1,0].set_title(lgdsmall+' density Map')
+    ax[1,1].set_title(lgdsmall+' density W (N) E')
+    ax[1,2].set_title(lgdsmall+' density N (W) S')
+    ax[1,3].set_title(lgdsmall+' mag. susc. Map')
+    ax[1,4].set_title(lgdsmall+' susc. W (N) E')
+    ax[1,5].set_title(lgdsmall+' susc. N (W) S')
+    ax[0,1].imshow(mag_crd,cmap='rainbow')
+    ax[0,2].imshow(grv_crd,cmap='rainbow')
+    ax[0,3].imshow(lit_crd[0,:,:],cmap='rainbow')
+    ax[0,4].imshow(lit_crd[:,0,:],cmap='rainbow')
+    ax[0,5].imshow(lit_crd[:,:,0],cmap='rainbow')
+    ax[1,0].imshow(rho_crd[0,:,:],cmap='rainbow')
+    ax[1,1].imshow(rho_crd[:,0,:],cmap='rainbow')
+    ax[1,2].imshow(rho_crd[:,:,0],cmap='rainbow')
+    ax[1,3].imshow(sus_crd[0,:,:],cmap='rainbow')
+    ax[1,4].imshow(sus_crd[:,0,:],cmap='rainbow')
+    ax[1,5].imshow(sus_crd[:,:,0],cmap='rainbow')
+    fig.subplots_adjust(left=0.0, bottom=0.0, right=2.0, top=1.05, wspace=0.1, hspace=0.1)
+    plt.show()
+    return
+
 def entropy(array):
     nbsamples = array.shape[-1]
     voxetdim = array.shape[0:-1]
