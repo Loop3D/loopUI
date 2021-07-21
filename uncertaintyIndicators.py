@@ -13,10 +13,14 @@ from numpy.random import default_rng
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from sklearn.cluster import KMeans
 import pywt
+from urllib.request import urlopen
+import gzip
 
 base = np.e
 
-# from noddyverse: define colormap
+#%% from noddyverse
+# define colormap 
+
 def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=False, verbose=True):
     """
     Creates a random colormap to be used together with matplotlib. Useful for segmentation tasks
@@ -89,14 +93,14 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
 
     return random_colormap
 
-# from noddyverse: download file, ungzip and stuff into numpy array
-from urllib.request import urlopen
-import gzip
+#download file, ungzip and stuff into numpy array
+
 def get_gz_array(url,skiprows):
     my_gzip_stream = urlopen(url)
     my_stream = gzip.open(my_gzip_stream, 'r')
     return(np.loadtxt(my_stream,skiprows=skiprows))
 
+#%% ENTROPY and CARDINALITY
 
 def cardinality(array):
     nbsamples = array.shape[-1]
@@ -209,6 +213,8 @@ def continuous_entropy(array,nbins):
     ent = np.reshape(ent,voxetdim)
     return ent
 
+#%% Multiple-Point Histogram Based distances
+
 def stochastic_upscale(mx,seed):
     rng = default_rng(seed)
     ndim = len(mx.shape)
@@ -262,7 +268,7 @@ def dist_kmeans_mph(img1,img2,n_levels,patternsize,n_clusters,nmax_patterns,seed
         tmp_shape=tuple(tmp_shape)
         # get nb patterns
         npat = np.prod(tmp_shape[:-1])
-        # get patterns and sample from ing1 and img2
+        # get patterns and sample from img1 and img2
         img1_all_patterns = np.ones(tmp_shape)*np.nan
         img2_all_patterns = np.ones(tmp_shape)*np.nan
         if verb:
@@ -319,9 +325,13 @@ def dist_kmeans_mph(img1,img2,n_levels,patternsize,n_clusters,nmax_patterns,seed
             img_cluster_id_pairs_dist[c,2] = tmp_dist[np.argmin(tmp_dist)]
             cpy_img2_cluster_id = np.delete(cpy_img2_cluster_id,np.argmin(tmp_dist))
         # compute distance contribution as density weighted distance between closest best paired clusters
-        weights_sum = np.sum(img1_cluster_size+img2_cluster_size)
-        weights = img1_cluster_size[(img_cluster_id_pairs_dist[:,0]).astype(int)] + img2_cluster_size[(img_cluster_id_pairs_dist[:,1]).astype(int)]
-        dist_mphc = np.sum(img_cluster_id_pairs_dist[:,2]*weights) / weights_sum 
+        p1 = img1_cluster_size/np.sum(img1_cluster_size)
+        p2 = img2_cluster_size/np.sum(img2_cluster_size)
+        weights = (np.abs(p1-p2)/(p1+p2))
+        # weights_sum = np.sum(img1_cluster_size+img2_cluster_size)
+        # weights = img1_cluster_size[(img_cluster_id_pairs_dist[:,0]).astype(int)] + img2_cluster_size[(img_cluster_id_pairs_dist[:,1]).astype(int)]
+        # dist_mphc = np.sum( img_cluster_id_pairs_dist[:,2] * weights ) / weights_sum 
+        dist_mphc = np.sum( ( (1+img_cluster_id_pairs_dist[:,2]) * (1+weights) - 1 ) ) 
         d += dist_mphc/n_levels
         if verb:
             print('Distance component: '+str(dist_mphc/n_levels))
@@ -462,6 +472,7 @@ def plot_kmeans_mph(img1,img2,l,kmeans_img1,kmeans_img2,img_cluster_id_pairs_dis
     plt.show()
     return
 
+#%% Kullback-Leibler and Jensen-Shanon divergences
 def kldiv(pVec1,pVec2,base,divtype):
     eps2 = np.finfo('float').eps**2
     pVec1 = pVec1 + eps2 
@@ -494,6 +505,8 @@ def jsdist_hist(img1,img2,nbins,base,plot=False):
         plt.legend()
         plt.show()        
     return kldiv(p1,p2,base,'js')
+
+#%% CONNECTIVITY
 
 def indicator_lag_connectivity(array,xxx,yyy,zzz,nblags,maxh,maxnbsamples,clblab='',verb=False):
     lag_count = np.zeros(nblags)+np.nan # lag center
@@ -788,12 +801,13 @@ def dist_lpnorm_categorical_lag_connectivity(img1,img2,xxx,yyy,zzz,nblags,maxh,m
             if verb:
                 print('img2 compute indicator_lag_connectivity')
             [lag_xc2,lag_ct2,lag_cp2] = indicator_lag_connectivity(img2bin,xxx,yyy,zzz,nblags,maxh,maxnbsamples,verb=verb)
-            d_ind[i] = weighted_lpnorm(lag_cp1,lag_cp2,pnorm,verb=verb)/nbind
-        d += d_ind[i]
+            d_ind[i] = weighted_lpnorm(lag_cp1,lag_cp2,pnorm,verb=verb)
+        d += 1/nbind * d_ind[i]**pnorm
         if verb:
             print('distance contribution: '+str(d_ind[i]))
         if plot:
             plot_ind_cty(img1,img2,lag_xc1,lag_cp1,lag_xc2,lag_cp2,classcode,clblab=clblab)
+    d = d**(1/pnorm)
     return d #, d_ind, id_ind
 
 def dist_lpnorm_percentile_lag_connectivity(img1,img2,xxx,yyy,zzz,npctiles,nblags,maxh,maxnbsamples,pnorm,clblab='',plot=False,verb=False):
@@ -883,10 +897,11 @@ def dist_lpnorm_percentile_lag_connectivity(img1,img2,xxx,yyy,zzz,npctiles,nblag
             d_hig = 1
         else:
             d_hig = weighted_lpnorm(hig_cp1,hig_cp2,pnorm,verb=verb)
-        d_pct[i] = (d_low + d_hig )*0.5/npctiles
+        d_pct[i] = (d_low**pnorm + d_hig**pnorm )*0.5/npctiles
         d += d_pct[i]
         if verb:
             print('distance contribution: '+str(d_pct[i]))
+    d = d**(1/pnorm)
     if verb:
         print('total distance: '+str(d))
     # plot option
@@ -1037,14 +1052,14 @@ def dist_lpnorm_percentile_global_connectivity(img1,img2,npctiles,pnorm,clblab='
     [low_connect2,hig_connect2,pctiles] = continuous_pct_connectivity(img2,npctiles,verb=verb)
     d_low = weighted_lpnorm(low_connect1,low_connect2,pnorm,verb=verb)
     d_hig = weighted_lpnorm(hig_connect1,hig_connect2,pnorm,verb=verb)
-    d = (d_low + d_hig)/2
+    d = ((d_low**pnorm + d_hig**pnorm)/2)**(1/pnorm)
     if verb: 
         print('d = '+str(d))
     if plot:
         plot_pct_cty(img1,img2,pctiles,low_connect1,low_connect2,hig_connect1,hig_connect2,clblab=clblab)
     return d #, d_ind, indicators
 
-
+#%% SEMI-VARIOGRAM
 def experimental_variogram(array,xxx,yyy,zzz,nblags,maxh,maxnbsamples,seed,verb=False):
     rng = default_rng(seed)
     ndim = len(array.shape)
@@ -1200,11 +1215,12 @@ def dist_experimental_variogram_categorical(img1,img2,xxx,yyy,zzz,nblags,maxh,ma
         [lag_xc2, lag_sv2, lag_ct2] = experimental_variogram(tmp2,xxx,yyy,zzz,nblags,maxh,maxnbsamples,seed,verb=verb)
         w = 2/(lag_xc1+lag_xc2)
         dbyclass[c] = weighted_lpnorm(lag_sv1,lag_sv2,pnorm,weights=w,verb=verb)
-        d+=dbyclass[c]
+        d+=dbyclass[c]**pnorm
         if verb:
             print('distance '+ curr_label +": "+str(dbyclass))
         if plot==True:
-            plot_experimental_variograms(img1,img2,lag_xc1,lag_xc2,lag_sv1,lag_sv2,curr_label)        
+            plot_experimental_variograms(img1,img2,lag_xc1,lag_xc2,lag_sv1,lag_sv2,curr_label)
+    d = d**(1/pnorm)
     return d
 
 def dist_experimental_variogram(img1,img2,xxx,yyy,zzz,nblags,maxh,maxnbsamples,pnorm,seed,categ=False,label="",verb=False,plot=False):
@@ -1215,6 +1231,7 @@ def dist_experimental_variogram(img1,img2,xxx,yyy,zzz,nblags,maxh,maxnbsamples,p
         d = dist_experimental_variogram_categorical(img1,img2,xxx,yyy,zzz,nblags,maxh,maxnbsamples,pnorm,seed,label=label,verb=verb,plot=plot)
     return d
 
+#%% WAVELET DECOMPOSITION
 def dist_wavelet2D(img1,img2,n_levels,n_bins,plot=False,verb=False):
     w = 1/(0+n_levels*4) # uniform weight per histogram  in the JS divergence
     DIV = 0
@@ -1560,7 +1577,6 @@ def discretize_img_pair(tmp1,tmp2,npctiles):
         img2[ix2] = i
     return img1,img2
 
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 def plot_topology_adjacency(categ1,categ2,adjac1,adjac2,leg,shd,lsgd,conti1=np.asarray(0),conti2=np.asarray(0)):
     ndim = len(categ1.shape)
