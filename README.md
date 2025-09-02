@@ -7,7 +7,7 @@ The *loopUI Python package* provides several functions to analyse the variabilit
 
 
 ## Installation
-*Note: package for python >=3.7*
+*Note: package for python >=3.9*
 
 To install the package: `python -m pip install loopui`
 
@@ -31,3 +31,4 @@ A series of *Python* notebooks demonstrate how to use the different functions.
 First, run `ui-0-data.ipynb` to load an ensemble of voxets. It is a pre-requisites prior running the other python notebooks. 
 
 In order to compare the various indicator via the viewing `ui-9-comparison.ipynb` notebook, a prerequisite is to run the cardinality and entropy notebooks (other pre-computed indicators are saved in the pickledata folder, but the indicators can be computed by running the appropriate notebook).
+
