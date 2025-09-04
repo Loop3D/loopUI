@@ -15,10 +15,10 @@ To uninstall the package: `python -m pip uninstall -y loopui`
 
 
 ## Requirements
-The following python packages are used by 'geone':
+The following python packages are used by 'loopui':
    - matplotlib
    - mpl_toolkits
-   - numpy
+   - numpy == 1.26.4
    - gzip
    - scipy
    - sklearn
@@ -31,4 +31,5 @@ A series of *Python* notebooks demonstrate how to use the different functions.
 First, run `ui-0-data.ipynb` to load an ensemble of voxets. It is a pre-requisites prior running the other python notebooks. 
 
 In order to compare the various indicator via the viewing `ui-9-comparison.ipynb` notebook, a prerequisite is to run the cardinality and entropy notebooks (other pre-computed indicators are saved in the pickledata folder, but the indicators can be computed by running the appropriate notebook).
+
 
